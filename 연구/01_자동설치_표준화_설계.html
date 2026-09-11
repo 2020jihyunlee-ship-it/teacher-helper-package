@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>교회패키지 cys 자동설치 — 표준화 설계</title>
+<style>
+  :root{--bg:#f6f7f9;--card:#fff;--ink:#1a1d23;--muted:#6b7280;--line:#e3e6eb;--acc:#2d3f63;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Malgun Gothic","맑은 고딕",-apple-system,system-ui,sans-serif;
+    line-height:1.65;font-size:15px}
+  .wrap{max-width:1080px;margin:0 auto;padding:36px 24px 80px}
+  header.top{background:linear-gradient(135deg,#1e2a44,#2d3f63);color:#fff;
+    border-radius:14px;padding:26px 30px;margin-bottom:24px}
+  header.top h1{margin:0 0 8px;font-size:25px;letter-spacing:-.4px}
+  header.top .meta{font-size:13.5px;opacity:.88;line-height:1.8}
+  h2.sec{font-size:19px;margin:34px 0 14px;padding-left:12px;border-left:5px solid var(--acc)}
+  h3.sub{font-size:16px;margin:20px 0 10px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-bottom:16px}
+  .decide{background:#fff8e6;border:2px solid #f0c14b;border-radius:12px;padding:20px 22px;margin-bottom:20px}
+  .decide h2{margin:0 0 12px;font-size:19px;color:#8a5a00}
+  table{width:100%;border-collapse:collapse;font-size:14px;background:#fff;
+    border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+  th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{background:#eef1f5;font-weight:700;font-size:13.5px}
+  tr:last-child td{border-bottom:none}
+  code{background:#eef1f5;padding:1.5px 6px;border-radius:5px;font-family:Consolas,"D2Coding",monospace;font-size:13px}
+  pre.term{background:#11151c;color:#d7e0ea;padding:16px 18px;border-radius:10px;
+    font-family:Consolas,"D2Coding",monospace;font-size:13.5px;line-height:1.8;overflow-x:auto;margin:10px 0}
+  pre.term b{color:#ffd166} pre.term .g{color:#7ee2b8} pre.term .r{color:#ff8a80} pre.term .m{color:#9aa5b1}
+  .key{background:#fff8e6;border:1px solid #f5d97a;border-radius:9px;padding:12px 15px;margin-top:11px;font-size:14px}
+  .warn{background:#fff1f0;border:1px solid #ffb3ad;border-radius:9px;padding:12px 15px;margin-top:11px;font-size:14px}
+  .note{background:#eef4ff;border:1px solid #c3d5f7;border-radius:9px;padding:12px 15px;margin-top:11px;font-size:14px}
+  .ok{color:#12805c;font-weight:700} .no{color:#d92d20;font-weight:700}
+  .star{color:#d92d20;font-weight:800}
+  footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>교회패키지 cys 자동설치 — 표준화 설계</h1>
+  <div class="meta">
+    작성: 샤론 · 2026-08-24 (연구 1차)<br>
+    대상: <code style="background:rgba(255,255,255,.15);color:#fff">github.com/yijae78/future-ministry-dept</code><br>
+    전제: Windows + cys 0.14.7 · 모든 사실은 <b>실측</b>. 추정은 [추정], 미확인은 [미확인]
+  </div>
+</header>
+
+<div class="decide">
+  <h2>■ 결정이 필요한 것</h2>
+  <b>Q. 자동화 트리거를 무엇으로 할 것인가 — 3안 중 택1(또는 조합)</b>
+  <table style="margin-top:12px">
+    <tr><th style="width:130px">안</th><th>사용자가 하는 일</th><th style="width:150px">난이도</th><th style="width:110px">권고</th></tr>
+    <tr><td><b>A. 원커맨드</b></td><td>PowerShell에 <b>한 줄</b> 붙여넣기</td><td>낮음(1~2일)</td><td><span class="star">★1순위</span></td></tr>
+    <tr><td><b>B. 드롭 폴더</b></td><td><code>~/.cys/packages/</code>에 <b>폴더만 넣기</b> → 자비스가 알아서</td><td>중간(3~5일)</td><td><span class="star">★2순위</span></td></tr>
+    <tr><td><b>C. GUI 버튼</b></td><td>자비스 앱에서 <b>클릭</b></td><td>높음(상류 기여 필요)</td><td>장기</td></tr>
+  </table>
+  <div style="margin-top:12px;font-size:14px">
+    <b>샤론 권고 — A로 시작해 B로 상시화.</b> A는 오늘의 <code>setup.ps1</code>을 거의 그대로 쓰고 포장만 바꾸면 되고,
+    B는 "가져오면 알아서 세팅"이라는 요구에 정확히 대응한다. C는 상류 저장소를 건드려야 해서 우리 통제 밖이다.
+  </div>
+</div>
+
+<h2 class="sec">1. 진단 — 지금 무엇이 없어서 수동인가</h2>
+
+<div class="card">
+  <p style="margin:0 0 12px">부서 패키지 설치는 <b>3개 층</b>으로 이뤄진다. 실측 결과 <b>2개는 이미 완성돼 있고, 1개만 없다.</b></p>
+  <table>
+    <tr><th style="width:110px">층</th><th>역할</th><th style="width:300px">현재 상태</th></tr>
+    <tr><td><b>L1 선언</b></td><td>무엇을 만들 것인가 (부서·기술자·경로)</td><td><span class="ok">✅ <code>manifest.json</code></span> — 잘 만들어져 있음</td></tr>
+    <tr><td><b>L2 수렴</b></td><td>선언과 실제 상태의 차이를 메움</td><td><span class="ok">✅ <code>tools/setup.ps1</code></span> 503줄 — 견고함</td></tr>
+    <tr><td><b>L3 트리거</b></td><td><b>누가 언제 L2를 실행시키는가</b></td><td><span class="no">❌ 없음 — 사람이 손으로 실행</span></td></tr>
+  </table>
+  <div class="key"><b>연구의 정답은 L1·L2를 새로 만드는 게 아니라 L3를 얹는 것이다.</b>
+    현재 <code>setup.ps1</code>은 이미 멱등·드라이런·원자저장·실패누적·검증보고를 갖춘 수준급 수렴기다. 버리면 손해다.</div>
+  <div class="note"><b><code>setup.ps1</code>은 이미 범용 엔진이다</b> — 칼빈 전용 하드코딩이 사실상 없다.
+    <code>manifest.json</code>을 읽어 그대로 수렴할 뿐이다. → 이름만 <code>cys-pkg</code>로 승격하면
+    <b>어떤 부서 패키지든 설치할 수 있다.</b> 교회패키지는 그 첫 적용 사례가 된다.</div>
+</div>
+
+<h2 class="sec">2. 이 PC 실측 결과</h2>
+
+<h3 class="sub">2-1. 칼빈 부서는 이미 설치돼 있다 (수동 1회 세팅분)</h3>
+<table>
+  <tr><th style="width:100px">dept</th><th style="width:170px">mission_key</th><th style="width:200px">parent</th><th>cwd</th></tr>
+  <tr><td>dept-2</td><td>future-ministry</td><td>(루트)</td><td><code>%HOME%\Future-Ministry</code></td></tr>
+  <tr><td>dept-7</td><td>fm-admin</td><td>Future Ministry(칼빈)</td><td><code>...\행정관리부</code></td></tr>
+  <tr><td>dept-8</td><td>fm-worship</td><td>Future Ministry(칼빈)</td><td><code>...\예배교육부</code></td></tr>
+  <tr><td>dept-10</td><td>fm-sermon</td><td>Future Ministry(칼빈)</td><td><code>...\설교기획부</code></td></tr>
+</table>
+<div class="note">parent 백필까지 정상. <code>setup.ps1</code>이 설계대로 동작했다는 실물 증거다.</div>
+<div class="warn"><b>⚠ 등록부-실물 괴리</b> — 레지스트리는 작업 폴더를 가리키는데 <b>그 폴더가 지금 없다.</b>
+  부서 등록은 살아 있으나 기술자 작업 폴더(클론된 리포 11개)는 사라진 상태다. [미확인] 소멸 경위.<br>
+  → 표준화가 반드시 다뤄야 할 실패 모드. <b>설치 = 1회 이벤트가 아니라 상시 수렴이어야 한다.</b></div>
+
+<h3 class="sub">2-2. cys에는 «패키지 설치» 표면이 없다 (상류 확인 완료)</h3>
+<div class="card">
+  <ul style="margin:0;padding-left:20px">
+    <li><code>cys --help</code> 전수 확인 — <code>dept</code> 계열 명령 <b>없음</b>. <code>init-pack</code>/<code>pack-update</code>는 <b>팩</b> 전용이지 부서 패키지용이 아니다.</li>
+    <li>상류 <code>idoforgod/cys-terminal</code> 파일 <b>702개 전수 조회</b> — <code>install</code>/<code>setup</code>/<code>package</code> 관련은 <b>cys 본체 설치 문서뿐</b>.</li>
+    <li>부서 생성 실체는 팩 안의 bash 스크립트 <code>~/.cys/pack/bin/cys-dept</code>(1101줄)이며 <code>create &lt;catalog-key&gt;</code> 서브커맨드가 실재한다.</li>
+  </ul>
+  <div class="key"><b>표준은 우리가 만들어야 한다.</b> 상류에 기대할 수 없다.</div>
+</div>
+
+<h2 class="sec">3. 표준이 반드시 지켜야 할 제약 9개 (전부 코드 실측)</h2>
+<p style="margin:0 0 10px;color:var(--muted)">이걸 어기면 자동화는 조용히 실패한다.</p>
+<table>
+  <tr><th style="width:55px">#</th><th style="width:290px">제약</th><th>근거(실측)</th><th style="width:200px">위반 시</th></tr>
+  <tr><td><b>C1</b></td><td><b>카탈로그 선행</b> — <code>dept-catalog.json</code>에 키가 먼저 있어야 create 가능</td><td><code>cys-dept:735</code></td><td>exit 4</td></tr>
+  <tr><td><b>C2</b></td><td><b>ACL</b> — <code>CYS_ROLE</code>이 set이고 <code>cso</code>가 아니면 부서 생성 차단</td><td><code>cys-dept:570-580</code></td><td><b>exit 7</b></td></tr>
+  <tr><td><b>C3</b></td><td><b>부서 수 상한</b> — live 부서 ≥ <code>CYS_DEPT_CAP</code>(기본 <b>8</b>)</td><td><code>cys-dept:801-805</code></td><td><b>exit 8</b></td></tr>
+  <tr><td><b>C4</b></td><td><b>parent 백필</b> — create는 parent를 쓰지 않음. UI 트리 진실원은 <code>depts.json</code></td><td><code>setup.ps1</code> ⑤b</td><td>하위 부가 루트로 평면화</td></tr>
+  <tr><td><b>C5</b></td><td><b>slug 계약</b> <code>^[a-z0-9_-]{1,32}$</code></td><td>상류 dept-qualified-keys-v2 §3</td><td>키 정규화·충돌</td></tr>
+  <tr><td><b>C6</b></td><td><b>기술자는 phoenix 보호 밖</b> — role 없는 좌석은 로스터에 못 담김</td><td><code>setup.ps1</code> 헤더</td><td><b>데몬 1회 재기동에 전멸</b></td></tr>
+  <tr><td><b>C7</b></td><td><b>BOM 금지</b> — cys-dept의 python <code>json.load</code>가 깨짐</td><td><code>Save-JsonAtomic</code> 주석</td><td>카탈로그 파손</td></tr>
+  <tr><td><b>C8</b></td><td><b><code>close-surface --reap</code> 필수</b> — 기본값은 묘비를 심음</td><td><code>setup.ps1</code> ⑧</td><td><b>부서 폐역</b></td></tr>
+  <tr><td><b>C9</b></td><td><b>좌석 제거 시 데몬 동반 사망 위험</b> — 부서 cysd가 좌석의 자손일 수 있음</td><td><code>-RemoveMaster</code> 경고</td><td>데몬 사망</td></tr>
+</table>
+
+<div class="warn"><b>★ 지금 당장 걸리는 제약: C3</b><br>
+  이 PC는 <b>등록 7개 / 상한 8개 → 여유 1개</b>. 칼빈은 부서 <b>4개</b>를 요구한다.
+  다만 create에는 <code>REUSE_UP</code>/<code>REUSE_BOOTING</code>/<code>REUSE_DEAD</code> 재사용 분기가 있어
+  <b>같은 mission_key면 재사용</b>된다(상한 면제).<br>
+  → <b>표준 설치기는 설치 전에 상한 여유를 먼저 계산해 알려야 한다.</b>
+  현행 <code>setup.ps1</code>에 이 사전 점검이 없다 — 개선 포인트.</div>
+
+<div class="note"><b>★ C2는 우리에게 열려 있다</b> — 이 세션 실측 <code>CYS_ROLE</code>은 <b>unset</b>이다.
+  ACL은 env 기준이므로 설치 실행은 통과한다. 다만 이건 방어의 구멍이기도 하다 —
+  [추정] 상류가 이 판정을 데몬 조회로 바꾸면 설치기가 막힐 수 있다.
+  표준은 <code>CYS_ROLE</code>을 명시적으로 비우고 실행하는 것을 계약에 넣어야 한다.</div>
+
+<h2 class="sec">4. 「동일하게 세팅」의 합격 기준</h2>
+<div class="card">
+  <p style="margin:0 0 10px">저장소의 <code>docs/design-preview.svg</code>가 기준 화면이다. 거기서 뽑은 <b>완료 조건 4개</b>:</p>
+  <ol style="margin:0;padding-left:22px;line-height:2">
+    <li>사이드바 <b>DEPARTMENTS</b> 트리에 <code>Future Ministry(칼빈)</code> 루트 + 하위 3부가 <b>들여쓰기</b>되어 표시</li>
+    <li>각 부 아래 <b>기술자 pane 행</b> — 행정 3 · 예배교육 3 · 설교기획 5 = <b>총 11</b></li>
+    <li>각 부서 데몬에서 <code>cys list</code> 시 <b><code>role=master</code> 1좌석 + <code>role=-</code> 기술자 N좌석</b></li>
+    <li>각 기술자 좌석의 <code>cwd</code>에 <b>리포가 실제 클론</b>되어 있을 것</li>
+  </ol>
+  <div class="key">자동 설치기의 검증 단계는 이 4개를 <b>증거로</b> 출력해야 한다 — "설치했다"는 말이 아니라.</div>
+</div>
+
+<h2 class="sec">5. 권고 표준 — 3층 구조</h2>
+<pre class="term"><b>L1 선언</b>   package.json (매니페스트 규격 v2)   <span class="m">← 패키지 제작자가 쓴다</span>
+<b>L2 수렴</b>   cys-pkg      (setup.ps1 일반화)     <span class="m">← 우리가 만든다 · 멱등</span>
+<b>L3 트리거</b> ①원커맨드 ②드롭폴더 ③스케줄러      <span class="r">← 이번 연구의 핵심</span></pre>
+
+<h3 class="sub">L3-① 원커맨드 (A안 · 1순위)</h3>
+<div class="card">
+  <p style="margin:0 0 8px">사용자가 하는 일 = <b>한 줄 붙여넣기</b>.</p>
+  <pre class="term">irm https://raw.githubusercontent.com/&lt;org&gt;/&lt;repo&gt;/main/install.ps1 | iex</pre>
+  <p style="margin:8px 0 0">이 한 줄이 내부에서: 전제 점검 → <code>git clone</code> → <code>setup.ps1 -Apply</code> → 검증 출력.</p>
+  <div class="warn"><b>⚠ 보안</b> — <code>irm|iex</code>는 원격 코드를 <b>무검증 실행</b>한다. 표준에 넣으려면 최소한
+    ①고정 태그·커밋 핀 ②SHA256 대조 ③실행 전 요약 표시+확인 중 하나는 있어야 한다.
+    (자비스 팩이 <code>.minisig</code> 서명을 쓰는 것과 같은 사상)</div>
+</div>
+
+<h3 class="sub">L3-② 드롭 폴더 (B안 · 2순위 — 요구에 가장 근접)</h3>
+<div class="card">
+  <pre class="term">~/.cys/packages/
+   └ future-ministry-dept/    <span class="m">← 여기에 폴더를 넣기만 하면</span>
+        package.json          <span class="m">← 자비스가 발견해서</span>
+        ...                   <span class="g">← 알아서 설치</span></pre>
+  <p style="margin:10px 0 0"><b>발화 지점 후보(실측으로 존재 확인)</b></p>
+  <ul style="margin:6px 0 0;padding-left:20px">
+    <li><b>세션 시작 훅</b> — <code>hooks/session-start.sh</code> 체계가 이미 있다</li>
+    <li><b>스케줄러</b> — <code>cys schedule add</code>로 주기 발화 가능 (데몬이 hot-reload)</li>
+  </ul>
+  <div class="key">동작: 미설치 패키지 발견 → <b>드라이런 요약을 먼저 제시</b> → 승인 시 수렴.
+    무단 자동 설치는 하지 않는다 — 부서 생성은 프로세스를 늘리는 비가역 조치다.</div>
+</div>
+
+<h3 class="sub">L3-③ 스케줄러 상시 수렴 (등록부-실물 괴리의 해법)</h3>
+<div class="card">
+  <pre class="term">cys schedule add  →  하루 1회  cys-pkg verify</pre>
+  <p style="margin:8px 0 0">선언 대비 실제(부서·좌석·폴더)를 대조해 <b>드리프트만 보고</b>. 자동 복구는 승인제.
+  → C6(기술자 전멸)과 2-1의 폴더 소실을 조기 발견하는 장치.</p>
+</div>
+
+<h2 class="sec">6. 다음 단계 (승인 후 착수)</h2>
+<table>
+  <tr><th style="width:50px">#</th><th>할 일</th><th style="width:180px">산출물</th><th style="width:200px">선행조건</th></tr>
+  <tr><td>1</td><td><b>재현 실험</b> — 현재 설치 상태에서 <code>setup.ps1</code> 드라이런 실행, 실제 편차 측정</td><td>실측 리포트</td><td>승인(쓰기 0이나 외부 스크립트 실행)</td></tr>
+  <tr><td>2</td><td>매니페스트 규격 v2 초안 (범용화·C1~C9 반영)</td><td><code>규격_v2.md</code></td><td>—</td></tr>
+  <tr><td>3</td><td><code>cys-pkg</code> 프로토타입 (setup.ps1 일반화 + 상한 사전점검 추가)</td><td><code>cys-pkg.ps1</code></td><td>2</td></tr>
+  <tr><td>4</td><td>원커맨드 <code>install.ps1</code> + 무결성 검증</td><td><code>install.ps1</code></td><td>3</td></tr>
+  <tr><td>5</td><td>드롭폴더 훅 + 스케줄 수렴</td><td>훅 스크립트</td><td>4</td></tr>
+</table>
+
+<h2 class="sec">7. 미확인 — 추측으로 채우지 않음</h2>
+<div class="card">
+  <ul style="margin:0;padding-left:20px;line-height:2">
+    <li>[미확인] 기존 작업 폴더 소멸 경위 — 삭제인가 이동인가</li>
+    <li>[미확인] 현재 칼빈 부서 4개의 <b>데몬 생존 여부</b> — 소켓 조회가 세션 정책상 차단됨(작업 디렉터리 밖). 권한 허용 또는 직접 확인 필요</li>
+    <li>[미확인] 자비스 앱 GUI가 부서 트리를 그리는 실제 코드(<code>ui/src/deptlabel.ts</code>) 미열람 — 기준 화면 4조건의 코드 수준 검증은 미완</li>
+    <li>[추정] 상류가 ACL 판정을 env→데몬 조회로 바꾸면 설치기가 막힐 수 있음</li>
+  </ul>
+</div>
+
+<footer>
+  샤론 · cys 연구조직 · 교회패키지 연구 프로젝트<br>
+  원본 마크다운: <code>C:\dev\church-package\연구\01_자동설치_표준화_설계.md</code> ·
+  관련 문서: <code>02_Windows_문제_개발자보고.html</code>
+</footer>
+
+</div>
+</body>
+</html>
